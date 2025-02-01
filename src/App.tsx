@@ -3,26 +3,47 @@
 /* eslint-disable jsx-a11y/control-has-associated-label */
 import React, { useEffect, useState } from 'react';
 import { UserWarning } from './UserWarning';
-import { USER_ID } from './api/todos';
+import { getTodos, USER_ID } from './api/todos';
 import { client } from './utils/fetchClient';
 import { Todo } from './types/Todo';
+import { Select } from './types/select';
 
 export const App: React.FC = () => {
   const [value, setValue] = useState<string>('');
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [loader, setLoader] = useState<boolean>(false);
+  const [loader, setLoader] = useState<Record<number, boolean>>({});
   const randomId = Math.floor(Math.random() * 100000000);
   const [errorMesage, setErrorMesage] = useState<string>('');
   const [uptdateSwitcher, setUpdateSwitcher] = useState<number>(0);
   const [updateValue, setUpdateValue] = useState<string>('');
+  const [todosCopy, setTodosCopy] = useState<Todo[]>([]);
+  const [select, setSelect] = useState<Select>({
+    0: true,
+    1: false,
+    2: false,
+  });
 
   useEffect(() => {
-    client.get<Todo[]>('/todos').then(setTodos);
+    getTodos()
+      .then(respond => {
+        setTodos(respond);
+        setTodosCopy(respond);
+      })
+      .catch(() => {
+        setErrorMesage('Unable to load todos');
+        setTimeout(() => {
+          setErrorMesage('');
+        }, 300);
+      });
   }, []);
 
   if (!USER_ID) {
     return <UserWarning />;
   }
+
+  const handleLoading = (id: number, state: boolean) => {
+    setLoader(prev => ({ ...prev, [id]: state }));
+  };
 
   const handleOnChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setValue(event.target.value.trim());
@@ -47,17 +68,16 @@ export const App: React.FC = () => {
     postRequest
       .then(response => {
         setErrorMesage('');
-        setLoader(true);
+        handleLoading(response.id, true);
         setTimeout(() => {
-          setLoader(false);
+          handleLoading(response.id, false);
           setTodos(prev => [...prev, response]);
         }, 100);
         setErrorMesage('');
         setValue('');
       })
-      .catch(error => {
+      .catch(() => {
         setErrorMesage('Title should not be empty');
-        console.error('Error creating todo:', error);
       });
   };
 
@@ -70,32 +90,36 @@ export const App: React.FC = () => {
         updatedTodo,
       );
 
-      setLoader(true);
+      handleLoading(todo.id, true);
       setTimeout(() => {
         setTodos(prev =>
           prev.map(todoObj =>
             todoObj.id === updatedPromis.id ? updatedPromis : todoObj,
           ),
         );
-        setLoader(false);
+        setTodosCopy(prev =>
+          prev.map(todoObj =>
+            todoObj.id === updatedPromis.id ? updatedPromis : todoObj,
+          ),
+        );
+        handleLoading(todo.id, false);
       }, 100);
     } catch (error) {
-      console.log(error);
+      setErrorMesage('dfsdf');
     }
   };
 
   const handleRemove = async (todo: Todo) => {
     try {
-      setLoader(true);
+      handleLoading(todo.id, true);
       setErrorMesage('');
       setTimeout(async () => {
         await client.delete(`/todos/${todo.id}`);
         setTodos(prev => prev.filter(todoPrev => todoPrev.id !== todo.id));
-        setLoader(false);
+        handleLoading(todo.id, false);
       }, 100);
     } catch (error) {
       setErrorMesage('Unable to delete a todo');
-      console.log(error);
     }
   };
 
@@ -104,7 +128,9 @@ export const App: React.FC = () => {
     setUpdateValue(todo.title);
   };
 
-  const handleUpdating = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpdatingOnChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setUpdateValue(event.target.value.trim());
   };
 
@@ -119,10 +145,10 @@ export const App: React.FC = () => {
         title: updateValue,
       });
 
-      setLoader(true);
+      handleLoading(todo.id, true);
       setUpdateSwitcher(0);
       setTimeout(() => {
-        setLoader(false);
+        handleLoading(todo.id, false);
         setTodos(prev =>
           prev.map(todoPromise =>
             todoPromise.id === respond.id ? respond : todoPromise,
@@ -131,7 +157,38 @@ export const App: React.FC = () => {
       }, 100);
     } catch (error) {
       setErrorMesage('');
-      console.log('error');
+    }
+  };
+
+  const handleFiltering = (param: string) => {
+    switch (param) {
+      case 'active':
+        setSelect({
+          0: false,
+          1: false,
+          2: false,
+        });
+        setSelect(prev => ({ ...prev, 1: true }));
+        setTodos([...todosCopy].filter(todo => !todo.completed));
+        break;
+      case 'completed':
+        setSelect({
+          0: false,
+          1: false,
+          2: false,
+        });
+        setSelect(prev => ({ ...prev, 2: true }));
+        setTodos([...todosCopy].filter(todo => todo.completed));
+        break;
+      default:
+        setTodos([...todosCopy]);
+        setSelect({
+          0: false,
+          1: false,
+          2: false,
+        });
+        setSelect(prev => ({ ...prev, 0: true }));
+        break;
     }
   };
 
@@ -210,7 +267,7 @@ export const App: React.FC = () => {
                       value={updateValue}
                       onBlur={() => setUpdateSwitcher(0)}
                       autoFocus
-                      onChange={handleUpdating}
+                      onChange={handleUpdatingOnChange}
                     />
                   </form>
                 )}
@@ -219,7 +276,7 @@ export const App: React.FC = () => {
 
                 <div
                   data-cy="TodoLoader"
-                  className={`modal overlay ${loader && 'is-active'}`}
+                  className={`modal overlay ${loader[todo.id] && 'is-active'}`}
                 >
                   <div className="modal-background has-background-white-ter" />
                   <div className="loader" />
@@ -230,34 +287,37 @@ export const App: React.FC = () => {
         </section>
 
         {/* Hide the footer if there are no todos */}
-        {todos && (
+        {todosCopy.length > 0 && (
           <footer className="todoapp__footer" data-cy="Footer">
             <span className="todo-count" data-cy="TodosCounter">
-              3 items left
+              {todosCopy.filter(todo => !todo.completed).length} items left
             </span>
 
             {/* Active link should have the 'selected' class */}
             <nav className="filter" data-cy="Filter">
               <a
                 href="#/"
-                className="filter__link selected"
+                className={`filter__link ${select[0] && 'selected'}`}
                 data-cy="FilterLinkAll"
+                onClick={() => handleFiltering('all')}
               >
                 All
               </a>
 
               <a
                 href="#/active"
-                className="filter__link"
+                className={`filter__link ${select[1] && 'selected'}`}
                 data-cy="FilterLinkActive"
+                onClick={() => handleFiltering('active')}
               >
                 Active
               </a>
 
               <a
                 href="#/completed"
-                className="filter__link"
+                className={`filter__link ${select[2] && 'selected'}`}
                 data-cy="FilterLinkCompleted"
+                onClick={() => handleFiltering('completed')}
               >
                 Completed
               </a>
@@ -278,21 +338,19 @@ export const App: React.FC = () => {
       {/* DON'T use conditional rendering to hide the notification */}
       {/* Add the 'hidden' class to hide the message smoothly */}
 
-      {errorMesage && (
-        <div
-          data-cy="ErrorNotification"
-          className="notification is-danger is-light has-text-weight-normal"
-        >
-          <button
-            data-cy="HideErrorButton"
-            type="button"
-            className="delete"
-            onClick={() => setErrorMesage('')}
-          />
-          {/* show only one message at a time */}
-          {errorMesage}
-        </div>
-      )}
+      <div
+        data-cy="ErrorNotification"
+        className={`notification is-danger is-light has-text-weight-normal ${!errorMesage && 'hidden'}`}
+      >
+        <button
+          data-cy="HideErrorButton"
+          type="button"
+          className="delete"
+          onClick={() => setErrorMesage('')}
+        />
+        {/* show only one message at a time */}
+        {errorMesage}
+      </div>
     </div>
   );
 };
