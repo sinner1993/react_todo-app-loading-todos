@@ -9,7 +9,7 @@ import { Select } from './types/select';
 import { Error } from './components/Error/Error';
 import { Footer } from './components/Footer/Footer';
 import { Todos } from './components/Todos/Todos';
-import { AddToDo } from './components/AddToDo/AddToDo';
+import { AddTodos } from './components/AddToDo/AddToDo';
 import {
   handleSubmit,
   handleComplete,
@@ -110,7 +110,7 @@ export const App: React.FC = () => {
           />
 
           {/* Add a todo on form submit */}
-          <AddToDo
+          <AddTodos
             handleSubmit={event =>
               handleSubmit(
                 event,

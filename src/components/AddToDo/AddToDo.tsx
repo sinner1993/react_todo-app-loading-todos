@@ -6,7 +6,7 @@ type Props = {
   value: string;
 };
 
-export const AddToDo: React.FC<Props> = ({
+export const AddTodos: React.FC<Props> = ({
   handleSubmit,
   handleOnChange,
   value,
