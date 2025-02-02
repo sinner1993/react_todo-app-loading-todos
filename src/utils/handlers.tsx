@@ -1,7 +1,6 @@
 import { Todo } from '../types/Todo';
-import { client } from './fetchClient';
+import { addTodos, removeTodos, updateTodos } from '../api/todos';
 
-// Лоадер для керування станом завантаження
 export const handleLoading = (
   id: number,
   state: boolean,
@@ -10,7 +9,6 @@ export const handleLoading = (
   setLoader(prev => ({ ...prev, [id]: state }));
 };
 
-// Додавання нового TODO
 export const handleSubmit = async (
   event: React.FormEvent<HTMLFormElement>,
   value: string,
@@ -36,7 +34,7 @@ export const handleSubmit = async (
   };
 
   try {
-    const response = await client.post<Todo>('/todos', newTodo);
+    const response = await addTodos(newTodo);
 
     handleLoading(response.id, true, setLoader);
 
@@ -50,7 +48,6 @@ export const handleSubmit = async (
   }
 };
 
-// Оновлення TODO (зміна статусу)
 export const handleComplete = async (
   todo: Todo,
   setTodos: React.Dispatch<React.SetStateAction<Todo[]>>,
@@ -62,10 +59,7 @@ export const handleComplete = async (
 
   try {
     handleLoading(todo.id, true, setLoader);
-    const updatedResponse: Todo = await client.patch(
-      `/todos/${todo.id}`,
-      updatedTodo,
-    );
+    const updatedResponse: Todo = await updateTodos(todo.id, updatedTodo);
 
     setTimeout(() => {
       setTodos(prev =>
@@ -85,7 +79,6 @@ export const handleComplete = async (
   }
 };
 
-// Видалення TODO
 export const handleRemove = async (
   todo: Todo,
   setTodos: React.Dispatch<React.SetStateAction<Todo[]>>,
@@ -97,7 +90,7 @@ export const handleRemove = async (
     setErrorMesage('');
 
     setTimeout(async () => {
-      await client.delete(`/todos/${todo.id}`);
+      await removeTodos(todo.id);
       setTodos(prev => prev.filter(item => item.id !== todo.id));
       handleLoading(todo.id, false, setLoader);
     }, 100);
@@ -106,7 +99,6 @@ export const handleRemove = async (
   }
 };
 
-// Оновлення назви TODO
 export const handleUpdateForm = async (
   event: React.FormEvent<HTMLFormElement>,
   todo: Todo,
@@ -125,7 +117,7 @@ export const handleUpdateForm = async (
   }
 
   try {
-    const updatedTodo: Todo = await client.patch(`/todos/${todo.id}`, {
+    const updatedTodo: Todo = await updateTodos(todo.id, {
       ...todo,
       title: updateValue,
     });
